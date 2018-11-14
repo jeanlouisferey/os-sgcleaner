@@ -22,10 +22,12 @@ import shade
 import argparse
 parser = argparse.ArgumentParser()
 parser.add_argument("cloud", help="name of your cloud defined in clouds.yml or in your openstack rc file", type=str)
+parser.add_argument("--deletesg", help="delete unused security groups", action="store_true")
+
 args=parser.parse_args()
 
-sgNames = set ()
-sgUsed = set ()
+sgsNames = set ()
+sgsUsed = set ()
 
 # Initialize cloud
 # Cloud configs are read with os-client-config
@@ -33,15 +35,22 @@ cloud = shade.openstack_cloud(cloud=args.cloud)
 
 # Get security group list
 for sg in cloud.list_security_groups():
-    sgNames.add(sg.name)
+    sgsNames.add(sg.name)
 
 # Get server list and get security groups used by each servers
 for server in cloud.list_servers():
-    for sgUsedByServer in (cloud.get_server(server.id)).security_groups:
-        sgUsed.add(sgUsedByServer["name"])
-
-print("These SGs are not used by any servers:")
+    for sgsUsedByServer in (cloud.get_server(server.id)).security_groups:
+        sgsUsed.add(sgsUsedByServer["name"])
 
 # from https://stackoverflow.com/questions/3462143/get-difference-between-two-lists/3462160#3462160
-for sg in list(sgNames - sgUsed):
-    print (sg)
+sgsNotSused = list(sgsNames - sgsUsed)
+
+if args.deletesg:
+    print('Deleting unused security groups:')
+    for sg in sgsNotSused:
+        cloud.delete_security_group(sg)
+        print(f'{sg} deleted')
+else:
+    print("These SGs are not used by any servers:")
+    for sg in sgsNotSused:
+        print (sg)
